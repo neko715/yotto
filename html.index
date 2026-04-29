@@ -1,0 +1,1500 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ヨット - マルチプレイヤー</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #16213e;
+    --bg3: #0f3460;
+    --accent: #e94560;
+    --accent2: #f5a623;
+    --text: #eaeaea;
+    --text-dim: #8899aa;
+    --green: #2ecc71;
+    --blue: #3498db;
+    --purple: #9b59b6;
+    --gold: #f1c40f;
+    --card: rgba(255,255,255,0.06);
+    --card-border: rgba(255,255,255,0.12);
+    --dice-face: #fefefe;
+    --dice-dot: #1a1a2e;
+    --dice-held: #f5a623;
+    --dice-held-dot: #1a1a2e;
+    --radius: 12px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(233,69,96,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(52,152,219,0.08) 0%, transparent 60%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app { position: relative; z-index: 1; }
+
+  /* ===== LOBBY ===== */
+  #lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    gap: 0;
+  }
+
+  .logo {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: clamp(3rem, 8vw, 6rem);
+    font-weight: 800;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #e94560, #f5a623);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+    text-shadow: none;
+    filter: drop-shadow(0 4px 16px rgba(233,69,96,0.4));
+  }
+
+  .logo-sub {
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 3rem;
+    font-weight: 400;
+  }
+
+  .lobby-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 2rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    backdrop-filter: blur(10px);
+    box-shadow: var(--shadow);
+  }
+
+  .lobby-card h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .input-group label {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .input-group input {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 1rem;
+    padding: 0.75rem 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  .input-group input:focus {
+    border-color: var(--accent);
+  }
+
+  .input-group input::placeholder { color: rgba(255,255,255,0.3); }
+
+  .btn {
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 0.85rem 1.5rem;
+    transition: transform 0.1s, opacity 0.2s;
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    color: white;
+    box-shadow: 0 4px 15px rgba(233,69,96,0.4);
+  }
+
+  .btn-secondary {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+  }
+
+  .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+  }
+
+  .divider::before, .divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--card-border);
+  }
+
+  /* ===== WAITING ROOM ===== */
+  #waiting {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    gap: 1.5rem;
+  }
+
+  .room-title {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent2);
+  }
+
+  .room-code-box {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    padding: 1.5rem 2.5rem;
+    text-align: center;
+  }
+
+  .room-code-label { font-size: 0.75rem; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0.5rem; }
+  .room-code { font-family: 'M PLUS Rounded 1c', sans-serif; font-size: 2.5rem; font-weight: 800; letter-spacing: 8px; color: var(--accent); }
+
+  .players-list {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 1.25rem 1.5rem;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  .players-list h3 { font-size: 0.8rem; color: var(--text-dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 1rem; }
+
+  .player-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 0.95rem;
+  }
+
+  .player-item:last-child { border-bottom: none; }
+
+  .player-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--green);
+    flex-shrink: 0;
+    box-shadow: 0 0 8px var(--green);
+  }
+
+  .host-badge {
+    font-size: 0.65rem;
+    background: rgba(245,166,35,0.2);
+    color: var(--accent2);
+    border: 1px solid rgba(245,166,35,0.4);
+    border-radius: 6px;
+    padding: 1px 6px;
+    margin-left: auto;
+  }
+
+  /* ===== GAME SCREEN ===== */
+  #game {
+    display: none;
+    padding: 1rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .game-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--card-border);
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .game-title { font-family: 'M PLUS Rounded 1c', sans-serif; font-size: 1.4rem; font-weight: 800; color: var(--accent); }
+
+  .turn-info {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    text-align: center;
+  }
+
+  .turn-info strong { color: var(--text); font-size: 1rem; }
+
+  .roll-counter {
+    display: flex;
+    gap: 4px;
+  }
+
+  .roll-pip {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+  }
+
+  .roll-pip.used { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+
+  /* ===== GAME LAYOUT ===== */
+  .game-layout {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .game-layout { grid-template-columns: 1fr; }
+  }
+
+  /* ===== SCORESHEET ===== */
+  .scoresheet {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .scoresheet-header {
+    background: rgba(255,255,255,0.06);
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  table.score-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .score-table th {
+    background: rgba(255,255,255,0.05);
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    font-weight: 500;
+    border-bottom: 1px solid var(--card-border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 70px;
+  }
+
+  .score-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    text-align: center;
+    transition: background 0.15s;
+  }
+
+  .score-table tr:last-child td { border-bottom: none; }
+
+  .score-table td.role-name {
+    text-align: left;
+    color: var(--text);
+    font-size: 0.8rem;
+    white-space: nowrap;
+    padding-left: 10px;
+  }
+
+  .score-table td.score-cell {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-weight: 700;
+    font-size: 0.9rem;
+  }
+
+  .score-table td.score-cell.filled { color: var(--text); }
+  .score-table td.score-cell.empty { color: rgba(255,255,255,0.15); }
+
+  .score-table td.score-cell.selectable {
+    color: var(--accent2);
+    cursor: pointer;
+    border-radius: 6px;
+    position: relative;
+  }
+
+  .score-table td.score-cell.selectable:hover {
+    background: rgba(245,166,35,0.15);
+    color: #fff;
+  }
+
+  .score-table tr.section-break td {
+    border-top: 2px solid rgba(255,255,255,0.1);
+  }
+
+  .score-table tr.bonus-row td {
+    background: rgba(245,166,35,0.05);
+  }
+
+  .score-table tr.bonus-row td.role-name { color: var(--accent2); }
+
+  .score-table tr.total-row td {
+    background: rgba(233,69,96,0.1);
+    font-size: 0.9rem;
+    font-weight: 700;
+    border-top: 2px solid var(--accent);
+  }
+
+  .score-table tr.total-row td.role-name { color: var(--accent); }
+
+  .my-column { background: rgba(233,69,96,0.05); }
+  .current-turn-col { background: rgba(52,152,219,0.08) !important; }
+
+  /* ===== DICE AREA ===== */
+  .dice-area {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .dice-container {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+  }
+
+  .dice-container h3 {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 1.25rem;
+    font-weight: 500;
+  }
+
+  .dice-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+  }
+
+  /* SVG DICE */
+  .die-wrapper {
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.15s;
+  }
+
+  .die-wrapper:hover .die-svg { filter: brightness(1.1); }
+  .die-wrapper:active { transform: scale(0.92); }
+
+  .die-wrapper.held .die-svg rect.die-bg { fill: var(--dice-held); }
+  .die-wrapper.held .die-svg circle { fill: var(--dice-held-dot); }
+
+  .die-wrapper.rolling .die-svg { animation: dieRoll 0.4s ease; }
+  @keyframes dieRoll {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-20deg) scale(0.9); }
+    50% { transform: rotate(15deg) scale(1.05); }
+    75% { transform: rotate(-10deg) scale(0.95); }
+    100% { transform: rotate(0deg) scale(1); }
+  }
+
+  .die-svg { width: 64px; height: 64px; display: block; }
+
+  .held-label {
+    position: absolute;
+    bottom: -18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.6rem;
+    color: var(--accent2);
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.15s;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .die-wrapper.held .held-label { opacity: 1; }
+
+  .dice-hint {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-bottom: 1rem;
+    min-height: 1em;
+  }
+
+  .roll-btn {
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    cursor: pointer;
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 800;
+    padding: 0.9rem;
+    width: 100%;
+    transition: transform 0.1s, opacity 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(233,69,96,0.35);
+    letter-spacing: 1px;
+  }
+
+  .roll-btn:hover:not(:disabled) { box-shadow: 0 6px 20px rgba(233,69,96,0.5); }
+  .roll-btn:active:not(:disabled) { transform: scale(0.97); }
+  .roll-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+
+  /* ===== CATEGORIES PANEL ===== */
+  .categories-panel {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .categories-header {
+    background: rgba(255,255,255,0.06);
+    padding: 0.75rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .cat-list { padding: 0.5rem; }
+
+  .cat-item {
+    display: flex;
+    align-items: center;
+    border-radius: 10px;
+    cursor: pointer;
+    gap: 0.75rem;
+    padding: 0.6rem 0.75rem;
+    transition: background 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cat-item.selectable:hover {
+    background: rgba(245,166,35,0.12);
+  }
+
+  .cat-item.selected-highlight {
+    background: rgba(245,166,35,0.18);
+    border: 1px solid rgba(245,166,35,0.4);
+  }
+
+  .cat-item.filled-item {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  .cat-item.section-break-item {
+    margin-top: 6px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding-top: 0.8rem;
+  }
+
+  .cat-name {
+    font-size: 0.85rem;
+    color: var(--text);
+    flex: 1;
+    white-space: nowrap;
+  }
+
+  .cat-score-preview {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent2);
+    min-width: 2.5rem;
+    text-align: right;
+  }
+
+  .cat-score-preview.zero { color: var(--text-dim); }
+  .cat-score-preview.filled-score { color: var(--text-dim); font-size: 0.85rem; }
+
+  .cat-desc {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    display: block;
+    margin-top: 1px;
+  }
+
+  .bonus-indicator {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .bonus-bar-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .bonus-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, var(--accent2));
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+
+  .bonus-text {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+    min-width: 80px;
+    text-align: right;
+  }
+
+  /* ===== SCORE OVERVIEW ===== */
+  .score-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .score-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 0.75rem;
+    text-align: center;
+  }
+
+  .score-card.is-me { border-color: rgba(233,69,96,0.4); background: rgba(233,69,96,0.06); }
+  .score-card.is-current { border-color: rgba(52,152,219,0.4); background: rgba(52,152,219,0.06); }
+
+  .score-card-name {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .score-card-pts {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  /* ===== GAME OVER ===== */
+  #gameover {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 2rem;
+    gap: 1.5rem;
+  }
+
+  .result-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 20px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 480px;
+    text-align: center;
+  }
+
+  .winner-name {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--gold);
+    margin-bottom: 0.25rem;
+    text-shadow: 0 0 30px rgba(241,196,15,0.5);
+  }
+
+  .final-scores {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .final-score-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    font-size: 1rem;
+  }
+
+  .final-score-row.winner { background: rgba(241,196,15,0.1); border: 1px solid rgba(241,196,15,0.3); }
+
+  .final-score-pts {
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--accent2);
+  }
+
+  /* ===== TOAST ===== */
+  #toast {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    background: #2ecc71;
+    color: #0d2b1e;
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    font-weight: 700;
+    font-size: 0.9rem;
+    box-shadow: 0 4px 20px rgba(46,204,113,0.4);
+    z-index: 9999;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+  #toast.error { background: var(--accent); color: white; box-shadow: 0 4px 20px rgba(233,69,96,0.4); }
+
+  /* ===== OTHER PLAYERS TURN ===== */
+  .waiting-overlay {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: rgba(52,152,219,0.1);
+    border: 1px solid rgba(52,152,219,0.3);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: #3498db;
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3498db;
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.6); }
+  }
+
+  .turn-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #e94560, #c0392b);
+    color: white;
+    border-radius: 8px;
+    padding: 2px 10px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    margin-left: 6px;
+    letter-spacing: 1px;
+  }
+
+  /* Loading */
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    flex-direction: column;
+    gap: 1rem;
+    color: var(--text-dim);
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .firebase-notice {
+    background: rgba(245,166,35,0.1);
+    border: 1px solid rgba(245,166,35,0.3);
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    font-size: 0.82rem;
+    color: var(--accent2);
+    line-height: 1.6;
+    max-width: 420px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- LOBBY -->
+<div id="lobby">
+  <div class="logo">ヨット</div>
+  <div class="logo-sub">Yacht Dice Game · Multiplayer</div>
+
+  <div class="lobby-card">
+    <h2>🎲 プレイヤー名</h2>
+    <div class="input-group">
+      <label>あなたの名前</label>
+      <input type="text" id="playerName" placeholder="名前を入力..." maxlength="12" />
+    </div>
+
+    <button class="btn btn-primary" onclick="createRoom()">🚢 新しい部屋を作る</button>
+
+    <div class="divider">または</div>
+
+    <div class="input-group">
+      <label>部屋コード</label>
+      <input type="text" id="roomCodeInput" placeholder="例: ABCD" maxlength="4" style="text-transform: uppercase; letter-spacing: 4px; font-size: 1.2rem; text-align: center;" oninput="this.value=this.value.toUpperCase()" />
+    </div>
+    <button class="btn btn-secondary" onclick="joinRoom()">🔑 部屋に入る</button>
+  </div>
+
+  <div class="firebase-notice" style="margin-top: 1.5rem;">
+    ℹ️ このゲームにはFirebaseの設定が必要です。<br>
+    <code style="font-size:0.75rem; opacity:0.8;">firebaseConfig</code> を実際の設定に変えてください。
+  </div>
+</div>
+
+<!-- WAITING -->
+<div id="waiting">
+  <div class="room-title">🎲 ヨット</div>
+  <div class="room-code-box">
+    <div class="room-code-label">部屋コード</div>
+    <div class="room-code" id="displayRoomCode">----</div>
+  </div>
+  <div class="players-list">
+    <h3>👥 参加者 <span id="playerCountWait">(0/6)</span></h3>
+    <div id="waitingPlayerList"></div>
+  </div>
+  <button class="btn btn-primary" id="startBtn" onclick="startGame()" style="max-width:320px; display:none;">▶ ゲームスタート！</button>
+  <div id="waitingMsg" style="color: var(--text-dim); font-size: 0.85rem;">ホストがゲームを開始するのを待っています...</div>
+  <button class="btn btn-secondary" onclick="leaveRoom()" style="max-width:320px;">退出する</button>
+</div>
+
+<!-- GAME -->
+<div id="game">
+  <div class="game-header">
+    <div class="game-title">🎲 ヨット</div>
+    <div class="turn-info" id="turnInfo">-</div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 0.75rem; color: var(--text-dim);">投:</span>
+      <div class="roll-counter" id="rollCounter">
+        <div class="roll-pip"></div>
+        <div class="roll-pip"></div>
+        <div class="roll-pip"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-bottom: 0.75rem;" id="scoreOverviewContainer">
+    <div class="score-overview" id="scoreOverview"></div>
+  </div>
+
+  <div id="waitingOverlay" class="waiting-overlay" style="display:none;">
+    <div class="pulse-dot"></div>
+    <span id="waitingOverlayText">他のプレイヤーのターンです...</span>
+  </div>
+
+  <div class="game-layout">
+    <!-- LEFT: SCORESHEET -->
+    <div>
+      <div class="scoresheet">
+        <div class="scoresheet-header">📊 スコアシート</div>
+        <div style="overflow-x: auto;">
+          <table class="score-table" id="scoreTable">
+            <thead id="scoreTableHead"></thead>
+            <tbody id="scoreTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: DICE + CATEGORIES -->
+    <div class="dice-area">
+      <div class="dice-container">
+        <h3>🎲 サイコロ（クリックでキープ）</h3>
+        <div class="dice-row" id="diceRow"></div>
+        <div class="dice-hint" id="diceHint">サイコロを振ってください</div>
+        <button class="btn roll-btn" id="rollBtn" onclick="rollDice()">🎲 サイコロを振る</button>
+      </div>
+
+      <div class="categories-panel">
+        <div class="categories-header">✋ 役を選ぶ（スコアを選択して確定）</div>
+        <div class="bonus-indicator">
+          <span style="font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;">上段</span>
+          <div class="bonus-bar-track">
+            <div class="bonus-bar-fill" id="bonusBar" style="width: 0%;"></div>
+          </div>
+          <div class="bonus-text" id="bonusText">0 / 63点</div>
+        </div>
+        <div class="cat-list" id="catList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="gameover">
+  <div class="logo">🏆</div>
+  <div class="result-card">
+    <div style="font-size: 0.9rem; color: var(--text-dim); margin-bottom: 0.5rem;">ゲーム終了！</div>
+    <div class="winner-name" id="winnerName">---</div>
+    <div style="font-size: 0.85rem; color: var(--text-dim);">の勝利！🎉</div>
+    <div class="final-scores" id="finalScores"></div>
+  </div>
+  <button class="btn btn-primary" onclick="backToLobby()" style="max-width: 280px;">🏠 ロビーへ戻る</button>
+</div>
+
+<div id="toast"></div>
+
+</div><!-- #app -->
+
+<script>
+// ===== FIREBASE CONFIG =====
+// ここに自分のFirebaseの設定を入れてください
+const firebaseConfig = {
+  apiKey: "AIzaSyCB7jLDaPR-9vcwYfWEZkNRt1ldp68TtIg",
+  authDomain: "yotto-5b3cc.firebaseapp.com",
+  databaseURL: "https://yotto-5b3cc-default-rtdb.firebaseio.com",
+  projectId: "yotto-5b3cc",
+  storageBucket: "yotto-5b3cc.firebasestorage.app",
+  messagingSenderId: "919686605080",
+  appId: "1:919686605080:web:d32277f7984b452ad7966d"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ===== GAME STATE =====
+let myId = 'p' + Math.random().toString(36).substr(2, 9);
+let myName = '';
+let currentRoomCode = '';
+let isHost = false;
+let gameStateListener = null;
+let roomListener = null;
+
+// ===== CATEGORIES DEFINITION =====
+const CATEGORIES = [
+  { id: 'ace',    name: 'エース',      desc: '1の目の合計',                  section: 0 },
+  { id: 'deuces', name: 'デュース',    desc: '2の目の合計',                  section: 0 },
+  { id: 'threes', name: 'トレイ',      desc: '3の目の合計',                  section: 0 },
+  { id: 'fours',  name: 'フォー',      desc: '4の目の合計',                  section: 0 },
+  { id: 'fives',  name: 'ファイブ',    desc: '5の目の合計',                  section: 0 },
+  { id: 'sixes',  name: 'シックス',    desc: '6の目の合計',                  section: 0 },
+  { id: 'choice',    name: 'チョイス',       desc: 'すべての目の合計',               section: 1 },
+  { id: 'fourdice',  name: 'フォーダイス',   desc: '同じ目が4つ以上（合計）',        section: 1 },
+  { id: 'fullhouse', name: 'フルハウス',     desc: '3つ+2つ（合計）',               section: 1 },
+  { id: 'sstraight', name: 'S.ストレート',   desc: '4つ連続（15点）',               section: 1 },
+  { id: 'bstraight', name: 'B.ストレート',   desc: '5つ連続（30点）',               section: 1 },
+  { id: 'yacht',     name: 'ヨット',         desc: '5つ同じ目（50点）',             section: 1 },
+];
+
+const CATEGORY_IDS = CATEGORIES.map(c => c.id);
+
+// ===== SCORE CALCULATION =====
+function calcScore(catId, dice) {
+  const d = dice.slice().sort((a, b) => a - b);
+  const counts = {};
+  d.forEach(v => counts[v] = (counts[v] || 0) + 1);
+  const sum = d.reduce((a, b) => a + b, 0);
+  const vals = Object.keys(counts).map(Number);
+  const maxCount = Math.max(...Object.values(counts));
+
+  switch (catId) {
+    case 'ace':    return d.filter(v => v === 1).reduce((a, b) => a + b, 0);
+    case 'deuces': return d.filter(v => v === 2).reduce((a, b) => a + b, 0);
+    case 'threes': return d.filter(v => v === 3).reduce((a, b) => a + b, 0);
+    case 'fours':  return d.filter(v => v === 4).reduce((a, b) => a + b, 0);
+    case 'fives':  return d.filter(v => v === 5).reduce((a, b) => a + b, 0);
+    case 'sixes':  return d.filter(v => v === 6).reduce((a, b) => a + b, 0);
+    case 'choice':    return sum;
+    case 'fourdice':  return maxCount >= 4 ? sum : 0;
+    case 'fullhouse': {
+      const counts2 = Object.values(counts).sort();
+      return (counts2.length === 2 && (counts2[0] === 2 || counts2[0] === 3)) ? sum : 0;
+    }
+    case 'sstraight': {
+      // 4 consecutive: 1-2-3-4, 2-3-4-5, 3-4-5-6
+      const uv = [...new Set(d)].sort((a,b)=>a-b);
+      let maxRun = 1, run = 1;
+      for (let i = 1; i < uv.length; i++) {
+        run = uv[i] === uv[i-1] + 1 ? run + 1 : 1;
+        maxRun = Math.max(maxRun, run);
+      }
+      return maxRun >= 4 ? 15 : 0;
+    }
+    case 'bstraight': {
+      const uv = [...new Set(d)].sort((a,b)=>a-b);
+      if (uv.length < 5) return 0;
+      let run = 1;
+      for (let i = 1; i < uv.length; i++) {
+        if (uv[i] === uv[i-1] + 1) run++; else run = 1;
+      }
+      return run >= 5 ? 30 : 0;
+    }
+    case 'yacht': return maxCount === 5 ? 50 : 0;
+    default: return 0;
+  }
+}
+
+function calcUpperTotal(scores) {
+  const upper = ['ace','deuces','threes','fours','fives','sixes'];
+  return upper.reduce((sum, id) => sum + (scores[id] !== undefined && scores[id] !== null ? scores[id] : 0), 0);
+}
+
+function calcBonus(scores) {
+  return calcUpperTotal(scores) >= 63 ? 35 : 0;
+}
+
+function calcTotal(scores) {
+  const base = CATEGORY_IDS.reduce((sum, id) => sum + (scores[id] !== undefined && scores[id] !== null ? scores[id] : 0), 0);
+  return base + calcBonus(scores);
+}
+
+// ===== ROOM CODE =====
+function genRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  return Array.from({length: 4}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
+
+// ===== UI HELPERS =====
+function showScreen(id) {
+  ['lobby','waiting','game','gameover'].forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.style.display = s === id ? (id === 'game' ? 'block' : 'flex') : 'none';
+  });
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show' + (isError ? ' error' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', 2500);
+}
+
+// ===== LOBBY ACTIONS =====
+async function createRoom() {
+  const name = document.getElementById('playerName').value.trim();
+  if (!name) { showToast('名前を入力してください', true); return; }
+  myName = name;
+
+  const code = genRoomCode();
+  currentRoomCode = code;
+  isHost = true;
+
+  const roomRef = db.ref('rooms/' + code);
+  await roomRef.set({
+    host: myId,
+    status: 'waiting',
+    players: {
+      [myId]: { name: myName, scores: {}, order: 0 }
+    },
+    currentTurn: 0,
+    currentPlayer: myId,
+    round: 1,
+    dice: [1,1,1,1,1],
+    held: [false,false,false,false,false],
+    rollCount: 0,
+    totalRounds: 12
+  });
+
+  document.getElementById('displayRoomCode').textContent = code;
+  showScreen('waiting');
+  document.getElementById('startBtn').style.display = 'block';
+  document.getElementById('waitingMsg').style.display = 'none';
+
+  listenRoom(code);
+}
+
+async function joinRoom() {
+  const name = document.getElementById('playerName').value.trim();
+  if (!name) { showToast('名前を入力してください', true); return; }
+  const code = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+  if (code.length !== 4) { showToast('4文字の部屋コードを入力してください', true); return; }
+
+  const roomRef = db.ref('rooms/' + code);
+  const snap = await roomRef.once('value');
+  const room = snap.val();
+  if (!room) { showToast('部屋が見つかりません', true); return; }
+  if (room.status !== 'waiting') { showToast('ゲームはすでに始まっています', true); return; }
+
+  const playerCount = Object.keys(room.players || {}).length;
+  if (playerCount >= 6) { showToast('部屋が満員です', true); return; }
+
+  myName = name;
+  currentRoomCode = code;
+  isHost = false;
+
+  await roomRef.child('players/' + myId).set({
+    name: myName,
+    scores: {},
+    order: playerCount
+  });
+
+  document.getElementById('displayRoomCode').textContent = code;
+  showScreen('waiting');
+  listenRoom(code);
+}
+
+function listenRoom(code) {
+  if (roomListener) roomListener();
+  roomListener = db.ref('rooms/' + code).on('value', snap => {
+    const room = snap.val();
+    if (!room) return;
+
+    const players = room.players || {};
+    const playerList = Object.entries(players).sort((a,b) => a[1].order - b[1].order);
+
+    // Update waiting list
+    const waitEl = document.getElementById('waitingPlayerList');
+    if (waitEl) {
+      waitEl.innerHTML = playerList.map(([pid, p]) => `
+        <div class="player-item">
+          <div class="player-dot"></div>
+          <span>${p.name}</span>
+          ${pid === room.host ? '<span class="host-badge">HOST</span>' : ''}
+        </div>
+      `).join('');
+      document.getElementById('playerCountWait').textContent = `(${playerList.length}/6)`;
+    }
+
+    if (room.status === 'playing') {
+      if (gameStateListener) db.ref('rooms/' + code).off('value', gameStateListener);
+      startGameUI(room);
+    }
+  });
+}
+
+async function startGame() {
+  if (!isHost) return;
+  const snap = await db.ref('rooms/' + currentRoomCode).once('value');
+  const room = snap.val();
+  const players = room.players || {};
+  const playerList = Object.entries(players).sort((a,b) => a[1].order - b[1].order);
+  if (playerList.length < 1) { showToast('プレイヤーが必要です', true); return; }
+
+  const firstPlayer = playerList[0][0];
+  await db.ref('rooms/' + currentRoomCode).update({
+    status: 'playing',
+    currentTurn: 0,
+    currentPlayer: firstPlayer,
+    round: 1,
+    dice: [1,1,1,1,1],
+    held: [false,false,false,false,false],
+    rollCount: 0
+  });
+}
+
+function leaveRoom() {
+  if (currentRoomCode) {
+    db.ref('rooms/' + currentRoomCode + '/players/' + myId).remove();
+    if (roomListener) db.ref('rooms/' + currentRoomCode).off('value', roomListener);
+  }
+  showScreen('lobby');
+}
+
+// ===== GAME UI =====
+let localGameState = null;
+let localDice = [1,1,1,1,1];
+let localHeld = [false,false,false,false,false];
+
+function startGameUI(room) {
+  showScreen('game');
+  localGameState = room;
+  localDice = room.dice || [1,1,1,1,1];
+  localHeld = room.held || [false,false,false,false,false];
+  renderGame(room);
+
+  // Listen for game state changes
+  db.ref('rooms/' + currentRoomCode).on('value', snap => {
+    const r = snap.val();
+    if (!r) return;
+    localGameState = r;
+    localDice = r.dice || [1,1,1,1,1];
+    localHeld = r.held || [false,false,false,false,false];
+    renderGame(r);
+
+    if (r.status === 'finished') {
+      showGameOver(r);
+    }
+  });
+}
+
+function renderGame(room) {
+  const players = room.players || {};
+  const playerOrder = Object.entries(players).sort((a,b) => a[1].order - b[1].order);
+  const isMyTurn = room.currentPlayer === myId;
+
+  // Turn info
+  const currentPlayerName = players[room.currentPlayer]?.name || '?';
+  document.getElementById('turnInfo').innerHTML =
+    `ラウンド ${room.round} / ${room.totalRounds} &nbsp;|&nbsp; <strong>${currentPlayerName}</strong>のターン${isMyTurn ? '<span class="turn-badge">あなた</span>' : ''}`;
+
+  // Roll counter
+  const pips = document.querySelectorAll('.roll-pip');
+  pips.forEach((p, i) => p.classList.toggle('used', i < room.rollCount));
+
+  // Score overview
+  const overview = document.getElementById('scoreOverview');
+  overview.innerHTML = playerOrder.map(([pid, p]) => {
+    const total = calcTotal(p.scores || {});
+    return `<div class="score-card ${pid === myId ? 'is-me' : ''} ${pid === room.currentPlayer ? 'is-current' : ''}">
+      <div class="score-card-name">${p.name}${pid === myId ? ' (あなた)' : ''}</div>
+      <div class="score-card-pts">${total}</div>
+    </div>`;
+  }).join('');
+
+  // Waiting overlay
+  const overlay = document.getElementById('waitingOverlay');
+  overlay.style.display = isMyTurn ? 'none' : 'flex';
+  document.getElementById('waitingOverlayText').textContent = `${currentPlayerName} のターンです...`;
+
+  // Roll button
+  const rollBtn = document.getElementById('rollBtn');
+  rollBtn.disabled = !isMyTurn || room.rollCount >= 3;
+  if (room.rollCount === 0) rollBtn.textContent = '🎲 サイコロを振る';
+  else if (room.rollCount < 3) rollBtn.textContent = `🎲 振り直す (残り${3 - room.rollCount}回)`;
+  else rollBtn.textContent = '✋ 役を選んでください';
+
+  // Dice hint
+  const hint = document.getElementById('diceHint');
+  if (!isMyTurn) hint.textContent = '他のプレイヤーのターンです';
+  else if (room.rollCount === 0) hint.textContent = 'サイコロを振ってください';
+  else if (room.rollCount < 3) hint.textContent = 'キープしたいサイコロをクリック、振り直してください';
+  else hint.textContent = '役を選んでください（下のリスト）';
+
+  // Render dice
+  renderDice(localDice, localHeld, isMyTurn && room.rollCount > 0);
+
+  // Score table
+  renderScoreTable(room, playerOrder);
+
+  // Category list (my scores with preview)
+  renderCategoryList(room, isMyTurn);
+
+  // Bonus bar (my scores)
+  const myScores = players[myId]?.scores || {};
+  const upperTotal = calcUpperTotal(myScores);
+  const pct = Math.min(100, (upperTotal / 63) * 100);
+  document.getElementById('bonusBar').style.width = pct + '%';
+  document.getElementById('bonusText').textContent = `${upperTotal} / 63点${upperTotal >= 63 ? ' ✓+35' : ''}`;
+}
+
+function renderDice(dice, held, interactive) {
+  const row = document.getElementById('diceRow');
+  row.innerHTML = '';
+  dice.forEach((val, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'die-wrapper' + (held[i] ? ' held' : '');
+    if (interactive) {
+      wrapper.onclick = () => toggleHold(i);
+    }
+    wrapper.innerHTML = `${diceSVG(val)}<span class="held-label">キープ</span>`;
+    row.appendChild(wrapper);
+  });
+}
+
+function diceSVG(value) {
+  const dotPositions = {
+    1: [[32,32]],
+    2: [[16,16],[48,48]],
+    3: [[16,16],[32,32],[48,48]],
+    4: [[16,16],[48,16],[16,48],[48,48]],
+    5: [[16,16],[48,16],[32,32],[16,48],[48,48]],
+    6: [[16,16],[48,16],[16,32],[48,32],[16,48],[48,48]]
+  };
+  const dots = (dotPositions[value] || []).map(([cx,cy]) =>
+    `<circle cx="${cx}" cy="${cy}" r="5.5" />`
+  ).join('');
+  return `<svg class="die-svg" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <rect class="die-bg" x="2" y="2" width="60" height="60" rx="12" ry="12" fill="var(--dice-face)" />
+    ${dots.replace(/<circle/g, '<circle fill="var(--dice-dot)"')}
+  </svg>`;
+}
+
+function toggleHold(i) {
+  const room = localGameState;
+  if (!room || room.currentPlayer !== myId || room.rollCount === 0) return;
+  localHeld[i] = !localHeld[i];
+  renderDice(localDice, localHeld, true);
+  db.ref('rooms/' + currentRoomCode + '/held').set(localHeld);
+}
+
+async function rollDice() {
+  const room = localGameState;
+  if (!room || room.currentPlayer !== myId || room.rollCount >= 3) return;
+
+  const newDice = localDice.map((d, i) => localHeld[i] ? d : Math.ceil(Math.random() * 6));
+  const newHeld = localHeld.slice();
+  const newRollCount = room.rollCount + 1;
+
+  // Animate rolling dice
+  const wrappers = document.querySelectorAll('.die-wrapper');
+  wrappers.forEach((w, i) => {
+    if (!localHeld[i]) {
+      w.querySelector('.die-svg').style.animation = 'none';
+      w.querySelector('.die-svg').offsetHeight; // reflow
+      w.querySelector('.die-svg').style.animation = 'dieRoll 0.4s ease';
+    }
+  });
+
+  localDice = newDice;
+  localHeld = newHeld;
+
+  await db.ref('rooms/' + currentRoomCode).update({
+    dice: newDice,
+    held: newHeld,
+    rollCount: newRollCount
+  });
+}
+
+function renderScoreTable(room, playerOrder) {
+  const head = document.getElementById('scoreTableHead');
+  const body = document.getElementById('scoreTableBody');
+
+  head.innerHTML = `<tr>
+    <th style="text-align:left; padding-left: 10px; min-width: 80px;">役</th>
+    ${playerOrder.map(([pid, p]) => `<th class="${pid === myId ? 'my-column' : ''} ${pid === room.currentPlayer ? 'current-turn-col' : ''}" title="${p.name}">${p.name.slice(0,5)}</th>`).join('')}
+  </tr>`;
+
+  let html = '';
+  CATEGORIES.forEach((cat, idx) => {
+    const isBreak = idx > 0 && CATEGORIES[idx-1].section !== cat.section;
+    const isLast = idx === CATEGORIES.length - 1;
+
+    html += `<tr class="${isBreak ? 'section-break' : ''}">
+      <td class="role-name">${cat.name}</td>
+      ${playerOrder.map(([pid, p]) => {
+        const scores = p.scores || {};
+        const hasScore = scores[cat.id] !== undefined && scores[cat.id] !== null;
+        return `<td class="score-cell ${hasScore ? 'filled' : 'empty'} ${pid === myId ? 'my-column' : ''} ${pid === room.currentPlayer ? 'current-turn-col' : ''}">
+          ${hasScore ? scores[cat.id] : '·'}
+        </td>`;
+      }).join('')}
+    </tr>`;
+
+    // After sixes, add bonus row
+    if (cat.id === 'sixes') {
+      html += `<tr class="bonus-row">
+        <td class="role-name">ボーナス</td>
+        ${playerOrder.map(([pid, p]) => {
+          const bonus = calcBonus(p.scores || {});
+          return `<td class="score-cell ${bonus > 0 ? 'filled' : 'empty'} ${pid === myId ? 'my-column' : ''}">
+            ${bonus > 0 ? '+35' : '·'}
+          </td>`;
+        }).join('')}
+      </tr>`;
+    }
+  });
+
+  // Total row
+  html += `<tr class="total-row section-break">
+    <td class="role-name">合計</td>
+    ${playerOrder.map(([pid, p]) => `<td class="score-cell filled ${pid === myId ? 'my-column' : ''}">
+      ${calcTotal(p.scores || {})}
+    </td>`).join('')}
+  </tr>`;
+
+  body.innerHTML = html;
+}
+
+function renderCategoryList(room, isMyTurn) {
+  const myScores = room.players?.[myId]?.scores || {};
+  const hasDice = room.rollCount > 0;
+  const catList = document.getElementById('catList');
+
+  let html = '';
+  CATEGORIES.forEach((cat, idx) => {
+    const isFilled = myScores[cat.id] !== undefined && myScores[cat.id] !== null;
+    const isBreak = idx > 0 && CATEGORIES[idx-1].section !== cat.section;
+    const preview = hasDice ? calcScore(cat.id, localDice) : null;
+    const canSelect = isMyTurn && hasDice && !isFilled;
+
+    html += `<div class="cat-item ${canSelect ? 'selectable' : ''} ${isFilled ? 'filled-item' : ''} ${isBreak ? 'section-break-item' : ''}"
+      ${canSelect ? `onclick="selectCategory('${cat.id}')"` : ''}>
+      <div style="flex: 1;">
+        <span class="cat-name">${cat.name}</span>
+        <span class="cat-desc">${cat.desc}</span>
+      </div>
+      <span class="cat-score-preview ${isFilled ? 'filled-score' : preview === 0 ? 'zero' : ''}">
+        ${isFilled ? myScores[cat.id] : (preview !== null ? preview : '')}
+      </span>
+    </div>`;
+  });
+
+  catList.innerHTML = html;
+}
+
+async function selectCategory(catId) {
+  const room = localGameState;
+  if (!room || room.currentPlayer !== myId || room.rollCount === 0) return;
+  const myScores = room.players?.[myId]?.scores || {};
+  if (myScores[catId] !== undefined && myScores[catId] !== null) {
+    showToast('すでに選択済みです', true);
+    return;
+  }
+
+  const score = calcScore(catId, localDice);
+  const catName = CATEGORIES.find(c => c.id === catId)?.name || catId;
+
+  // Update score
+  await db.ref(`rooms/${currentRoomCode}/players/${myId}/scores/${catId}`).set(score);
+  showToast(`${catName}: ${score}点！`);
+
+  // Check if this player is done
+  const updatedScores = { ...myScores, [catId]: score };
+  const filledCount = CATEGORY_IDS.filter(id => updatedScores[id] !== undefined && updatedScores[id] !== null).length;
+
+  const players = room.players || {};
+  const playerOrder = Object.entries(players).sort((a,b) => a[1].order - b[1].order);
+  const currentIndex = playerOrder.findIndex(([pid]) => pid === myId);
+  const nextIndex = (currentIndex + 1) % playerOrder.length;
+  const nextPlayerId = playerOrder[nextIndex][0];
+  const isLastInRound = nextIndex === 0;
+  const newRound = isLastInRound ? room.round + 1 : room.round;
+
+  // Check if game is over (all players filled all categories)
+  const allDone = playerOrder.every(([pid, p]) => {
+    const sc = pid === myId ? updatedScores : (p.scores || {});
+    return CATEGORY_IDS.every(id => sc[id] !== undefined && sc[id] !== null);
+  });
+
+  if (allDone || newRound > room.totalRounds) {
+    // Game over
+    await db.ref('rooms/' + currentRoomCode).update({ status: 'finished' });
+    return;
+  }
+
+  await db.ref('rooms/' + currentRoomCode).update({
+    currentPlayer: nextPlayerId,
+    currentTurn: room.currentTurn + 1,
+    round: newRound,
+    dice: [1,1,1,1,1],
+    held: [false,false,false,false,false],
+    rollCount: 0
+  });
+}
+
+function showGameOver(room) {
+  showScreen('gameover');
+  const players = room.players || {};
+  const ranked = Object.entries(players)
+    .map(([pid, p]) => ({ pid, name: p.name, total: calcTotal(p.scores || {}) }))
+    .sort((a, b) => b.total - a.total);
+
+  document.getElementById('winnerName').textContent = ranked[0].name;
+
+  const finalDiv = document.getElementById('finalScores');
+  finalDiv.innerHTML = ranked.map((r, i) => `
+    <div class="final-score-row ${i === 0 ? 'winner' : ''}">
+      <span>${i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'} ${r.name} ${r.pid === myId ? '(あなた)' : ''}</span>
+      <span class="final-score-pts">${r.total}点</span>
+    </div>
+  `).join('');
+}
+
+function backToLobby() {
+  if (currentRoomCode) {
+    db.ref('rooms/' + currentRoomCode).off();
+  }
+  currentRoomCode = '';
+  isHost = false;
+  localGameState = null;
+  showScreen('lobby');
+}
+
+// Init
+showScreen('lobby');
+</script>
+</body>
+</html>
