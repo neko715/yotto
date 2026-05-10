@@ -333,6 +333,20 @@
     border-bottom: 1px solid var(--card-border);
   }
 
+  .scoresheet-subheader {
+    padding: 0.85rem 1rem 0.65rem;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .scoresheet-guide {
+    font-size: 0.76rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
   table.score-table {
     width: 100%;
     border-collapse: collapse;
@@ -366,8 +380,21 @@
     text-align: left;
     color: var(--text);
     font-size: 0.8rem;
-    white-space: nowrap;
     padding-left: 10px;
+  }
+
+  .role-main {
+    display: block;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .role-sub {
+    display: block;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+    line-height: 1.3;
   }
 
   .score-table td.score-cell {
@@ -384,11 +411,21 @@
     cursor: pointer;
     border-radius: 6px;
     position: relative;
+    box-shadow: inset 0 0 0 1px rgba(245,166,35,0.45);
+    background: rgba(245,166,35,0.08);
   }
 
   .score-table td.score-cell.selectable:hover {
     background: rgba(245,166,35,0.15);
     color: #fff;
+  }
+
+  .score-table td.score-cell.preview-zero {
+    color: var(--text-dim);
+  }
+
+  .score-table td.score-cell.selectable.preview-zero {
+    color: var(--accent2);
   }
 
   .score-table tr.section-break td {
@@ -512,91 +549,11 @@
   .roll-btn:active:not(:disabled) { transform: scale(0.97); }
   .roll-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
 
-  /* ===== CATEGORIES PANEL ===== */
-  .categories-panel {
-    background: var(--card);
-    border: 1px solid var(--card-border);
-    border-radius: 16px;
-    overflow: hidden;
-  }
-
-  .categories-header {
-    background: rgba(255,255,255,0.06);
-    padding: 0.75rem 1rem;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    border-bottom: 1px solid var(--card-border);
-  }
-
-  .cat-list { padding: 0.5rem; }
-
-  .cat-item {
-    display: flex;
-    align-items: center;
-    border-radius: 10px;
-    cursor: pointer;
-    gap: 0.75rem;
-    padding: 0.6rem 0.75rem;
-    transition: background 0.15s;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .cat-item.selectable:hover {
-    background: rgba(245,166,35,0.12);
-  }
-
-  .cat-item.selected-highlight {
-    background: rgba(245,166,35,0.18);
-    border: 1px solid rgba(245,166,35,0.4);
-  }
-
-  .cat-item.filled-item {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .cat-item.section-break-item {
-    margin-top: 6px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    padding-top: 0.8rem;
-  }
-
-  .cat-name {
-    font-size: 0.85rem;
-    color: var(--text);
-    flex: 1;
-    white-space: nowrap;
-  }
-
-  .cat-score-preview {
-    font-family: 'M PLUS Rounded 1c', sans-serif;
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--accent2);
-    min-width: 2.5rem;
-    text-align: right;
-  }
-
-  .cat-score-preview.zero { color: var(--text-dim); }
-  .cat-score-preview.filled-score { color: var(--text-dim); font-size: 0.85rem; }
-
-  .cat-desc {
-    font-size: 0.68rem;
-    color: var(--text-dim);
-    display: block;
-    margin-top: 1px;
-  }
-
   .bonus-indicator {
-    background: var(--card);
-    border: 1px solid var(--card-border);
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
     border-radius: 12px;
-    padding: 0.75rem 1rem;
-    margin: 0.5rem;
+    padding: 0.7rem 0.85rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -737,6 +694,14 @@
 
   #toast.show { opacity: 1; transform: translateY(0); }
   #toast.error { background: var(--accent); color: white; box-shadow: 0 4px 20px rgba(233,69,96,0.4); }
+  #toast.rare {
+    background: linear-gradient(135deg, #f1c40f, #f39c12);
+    color: #3d2b00;
+    box-shadow: 0 8px 28px rgba(241,196,15,0.45);
+    font-family: 'M PLUS Rounded 1c', sans-serif;
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
 
   /* ===== OTHER PLAYERS TURN ===== */
   .waiting-overlay {
@@ -889,6 +854,16 @@
     <div>
       <div class="scoresheet">
         <div class="scoresheet-header">📊 スコアシート</div>
+        <div class="scoresheet-subheader">
+          <div class="scoresheet-guide" id="scoreSheetGuide">自分の列で光っているマスを押すと、その役で確定できます。</div>
+          <div class="bonus-indicator">
+            <span style="font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;">上段</span>
+            <div class="bonus-bar-track">
+              <div class="bonus-bar-fill" id="bonusBar" style="width: 0%;"></div>
+            </div>
+            <div class="bonus-text" id="bonusText">0 / 63点</div>
+          </div>
+        </div>
         <div style="overflow-x: auto;">
           <table class="score-table" id="scoreTable">
             <thead id="scoreTableHead"></thead>
@@ -905,18 +880,6 @@
         <div class="dice-row" id="diceRow"></div>
         <div class="dice-hint" id="diceHint">サイコロを振ってください</div>
         <button class="btn roll-btn" id="rollBtn" onclick="rollDice()">🎲 サイコロを振る</button>
-      </div>
-
-      <div class="categories-panel">
-        <div class="categories-header">✋ 役を選ぶ（スコアを選択して確定）</div>
-        <div class="bonus-indicator">
-          <span style="font-size: 0.75rem; color: var(--text-dim); white-space: nowrap;">上段</span>
-          <div class="bonus-bar-track">
-            <div class="bonus-bar-fill" id="bonusBar" style="width: 0%;"></div>
-          </div>
-          <div class="bonus-text" id="bonusText">0 / 63点</div>
-        </div>
-        <div class="cat-list" id="catList"></div>
       </div>
     </div>
   </div>
@@ -1062,6 +1025,38 @@ function showToast(msg, isError = false) {
   t._timer = setTimeout(() => t.className = '', 2500);
 }
 
+function showRareToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show rare';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.className = '', 2200);
+}
+
+function detectNotableRoll(dice) {
+  if (!Array.isArray(dice) || dice.length !== 5) return null;
+  if (calcScore('yacht', dice) > 0) return 'ヨット!';
+  if (calcScore('bstraight', dice) > 0) return 'ビッグストレート!';
+  if (calcScore('fullhouse', dice) > 0) return 'フルハウス!';
+  if (calcScore('fourdice', dice) > 0) return 'フォーダイス!';
+  if (calcScore('sstraight', dice) > 0) return 'スモールストレート!';
+  return null;
+}
+
+function announceNotableRoll(room) {
+  if (!room || room.rollCount === 0) {
+    lastAnnouncedRollKey = '';
+    return;
+  }
+  const diceKey = (room.dice || []).join(',');
+  const rollKey = `${room.currentTurn}:${room.rollCount}:${diceKey}`;
+  if (rollKey === lastAnnouncedRollKey) return;
+  lastAnnouncedRollKey = rollKey;
+
+  const notable = detectNotableRoll(room.dice || []);
+  if (notable) showRareToast(notable);
+}
+
 // ===== LOBBY ACTIONS =====
 async function createRoom() {
   const name = document.getElementById('playerName').value.trim();
@@ -1180,6 +1175,7 @@ function leaveRoom() {
     db.ref('rooms/' + currentRoomCode + '/players/' + myId).remove();
     if (roomListener) db.ref('rooms/' + currentRoomCode).off('value', roomListener);
   }
+  lastAnnouncedRollKey = '';
   showScreen('lobby');
 }
 
@@ -1187,13 +1183,16 @@ function leaveRoom() {
 let localGameState = null;
 let localDice = [1,1,1,1,1];
 let localHeld = [false,false,false,false,false];
+let lastAnnouncedRollKey = '';
 
 function startGameUI(room) {
   showScreen('game');
   localGameState = room;
   localDice = room.dice || [1,1,1,1,1];
   localHeld = room.held || [false,false,false,false,false];
+  lastAnnouncedRollKey = '';
   renderGame(room);
+  announceNotableRoll(room);
 
   // Listen for game state changes
   db.ref('rooms/' + currentRoomCode).on('value', snap => {
@@ -1203,6 +1202,7 @@ function startGameUI(room) {
     localDice = r.dice || [1,1,1,1,1];
     localHeld = r.held || [false,false,false,false,false];
     renderGame(r);
+    announceNotableRoll(r);
 
     if (r.status === 'finished') {
       showGameOver(r);
@@ -1251,16 +1251,18 @@ function renderGame(room) {
   if (!isMyTurn) hint.textContent = '他のプレイヤーのターンです';
   else if (room.rollCount === 0) hint.textContent = 'サイコロを振ってください';
   else if (room.rollCount < 3) hint.textContent = 'キープしたいサイコロをクリック、振り直してください';
-  else hint.textContent = '役を選んでください（下のリスト）';
+  else hint.textContent = '左のスコア表から役を選んでください';
+
+  const scoreSheetGuide = document.getElementById('scoreSheetGuide');
+  if (!isMyTurn) scoreSheetGuide.textContent = `${currentPlayerName} さんが表から役を選ぶターンです。`;
+  else if (room.rollCount === 0) scoreSheetGuide.textContent = 'サイコロを振ると、あなたの列に入る点数候補が表示されます。';
+  else scoreSheetGuide.textContent = 'あなたの列で光っているマスを押すと、その役で確定できます。';
 
   // Render dice
   renderDice(localDice, localHeld, isMyTurn && room.rollCount > 0);
 
   // Score table
   renderScoreTable(room, playerOrder);
-
-  // Category list (my scores with preview)
-  renderCategoryList(room, isMyTurn);
 
   // Bonus bar (my scores)
   const myScores = players[myId]?.scores || {};
@@ -1341,6 +1343,8 @@ async function rollDice() {
 function renderScoreTable(room, playerOrder) {
   const head = document.getElementById('scoreTableHead');
   const body = document.getElementById('scoreTableBody');
+  const isMyTurn = room.currentPlayer === myId;
+  const hasDice = room.rollCount > 0;
 
   head.innerHTML = `<tr>
     <th style="text-align:left; padding-left: 10px; min-width: 80px;">役</th>
@@ -1353,12 +1357,16 @@ function renderScoreTable(room, playerOrder) {
     const isLast = idx === CATEGORIES.length - 1;
 
     html += `<tr class="${isBreak ? 'section-break' : ''}">
-      <td class="role-name">${cat.name}</td>
+      <td class="role-name"><span class="role-main">${cat.name}</span><span class="role-sub">${cat.desc}</span></td>
       ${playerOrder.map(([pid, p]) => {
         const scores = p.scores || {};
         const hasScore = scores[cat.id] !== undefined && scores[cat.id] !== null;
-        return `<td class="score-cell ${hasScore ? 'filled' : 'empty'} ${pid === myId ? 'my-column' : ''} ${pid === room.currentPlayer ? 'current-turn-col' : ''}">
-          ${hasScore ? scores[cat.id] : '·'}
+        const preview = pid === myId && isMyTurn && hasDice && !hasScore ? calcScore(cat.id, localDice) : null;
+        const canSelect = pid === myId && isMyTurn && hasDice && !hasScore;
+        const cellValue = hasScore ? scores[cat.id] : (preview !== null ? preview : '·');
+        return `<td class="score-cell ${hasScore ? 'filled' : 'empty'} ${canSelect ? 'selectable' : ''} ${preview === 0 ? 'preview-zero' : ''} ${pid === myId ? 'my-column' : ''} ${pid === room.currentPlayer ? 'current-turn-col' : ''}"
+          ${canSelect ? `onclick="selectCategory('${cat.id}')"` : ''}>
+          ${cellValue}
         </td>`;
       }).join('')}
     </tr>`;
@@ -1386,33 +1394,6 @@ function renderScoreTable(room, playerOrder) {
   </tr>`;
 
   body.innerHTML = html;
-}
-
-function renderCategoryList(room, isMyTurn) {
-  const myScores = room.players?.[myId]?.scores || {};
-  const hasDice = room.rollCount > 0;
-  const catList = document.getElementById('catList');
-
-  let html = '';
-  CATEGORIES.forEach((cat, idx) => {
-    const isFilled = myScores[cat.id] !== undefined && myScores[cat.id] !== null;
-    const isBreak = idx > 0 && CATEGORIES[idx-1].section !== cat.section;
-    const preview = hasDice ? calcScore(cat.id, localDice) : null;
-    const canSelect = isMyTurn && hasDice && !isFilled;
-
-    html += `<div class="cat-item ${canSelect ? 'selectable' : ''} ${isFilled ? 'filled-item' : ''} ${isBreak ? 'section-break-item' : ''}"
-      ${canSelect ? `onclick="selectCategory('${cat.id}')"` : ''}>
-      <div style="flex: 1;">
-        <span class="cat-name">${cat.name}</span>
-        <span class="cat-desc">${cat.desc}</span>
-      </div>
-      <span class="cat-score-preview ${isFilled ? 'filled-score' : preview === 0 ? 'zero' : ''}">
-        ${isFilled ? myScores[cat.id] : (preview !== null ? preview : '')}
-      </span>
-    </div>`;
-  });
-
-  catList.innerHTML = html;
 }
 
 async function selectCategory(catId) {
@@ -1490,6 +1471,7 @@ function backToLobby() {
   currentRoomCode = '';
   isHost = false;
   localGameState = null;
+  lastAnnouncedRollKey = '';
   showScreen('lobby');
 }
 
